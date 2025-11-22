@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Stock Price Predictor - Tooba Fatima</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <style>
+    * {
+      box-sizing: border-box;
+      font-family: Arial, Helvetica, sans-serif;
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      background: #f4f6fb;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 900px;
+      width: 100%;
+      background: #ffffff;
+      margin: 20px;
+      padding: 20px 25px 30px;
+      border-radius: 12px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+    }
+
+    h1 {
+      text-align: center;
+      margin-top: 0;
+      color: #2b3a67;
+    }
+
+    p.subtitle {
+      text-align: center;
+      color: #555;
+      margin-bottom: 25px;
+    }
+
+    .section-title {
+      margin-top: 15px;
+      margin-bottom: 8px;
+      font-weight: bold;
+      color: #333;
+    }
+
+    textarea {
+      width: 100%;
+      min-height: 120px;
+      padding: 10px;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+      resize: vertical;
+      font-size: 14px;
+    }
+
+    button {
+      margin-top: 15px;
+      padding: 10px 18px;
+      border-radius: 8px;
+      border: none;
+      background: #2b3a67;
+      color: #fff;
+      font-size: 15px;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background: #1f2a4b;
+    }
+
+    .result-box {
+      margin-top: 20px;
+      padding: 15px;
+      border-radius: 8px;
+      background: #f7f9ff;
+      border: 1px solid #d0d7ff;
+      font-size: 15px;
+    }
+
+    .result-title {
+      font-weight: bold;
+      margin-bottom: 8px;
+    }
+
+    #chart {
+      width: 100%;
+      height: 320px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      margin-top: 20px;
+      background: #fafafa;
+    }
+
+    .footer {
+      margin-top: 25px;
+      font-size: 13px;
+      color: #777;
+      text-align: center;
+    }
+
+    @media (max-width: 600px) {
+      .container {
+        margin: 10px;
+        padding: 15px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Stock Price Predictor</h1>
+    <p class="subtitle">
+      Simple linear regression based stock price prediction (Frontend Demo)<br/>
+      Developed by <strong>Tooba Fatima</strong>
+    </p>
+
+    <div>
+      <div class="section-title">Step 1: Enter historical closing prices</div>
+      <p style="font-size: 14px; margin-top: 4px;">
+        Enter closing prices separated by commas (for example: <br/>
+        <code>101, 103, 105, 106, 108, 110</code>).<br/>
+        The model will use linear regression to predict the <b>next day's price</b>.
+      </p>
+      <textarea id="priceInput">101, 103, 105, 106, 108, 110</textarea>
+
+      <button id="predictBtn">Predict Next Price</button>
+
+      <div class="result-box" id="resultBox" style="display:none;">
+        <div class="result-title">Prediction Result</div>
+        <div id="equationText"></div>
+        <div id="predictionText" style="margin-top: 6px;"></div>
+        <div id="detailsText" style="margin-top: 6px; font-size: 13px;"></div>
+      </div>
+
+      <canvas id="chart"></canvas>
+
+      <div class="footer">
+        This is an educational demo showing how stock price prediction using linear regression works
+        in the browser with HTML, CSS and JavaScript.
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Parse comma-separated numbers from textarea
+    function parsePrices(text) {
+      const parts = text.split(",");
+      const nums = [];
+
+      for (let p of parts) {
+        const n = parseFloat(p.trim());
+        if (!isNaN(n)) {
+          nums.push(n);
+        }
+      }
+      return nums;
+    }
+
+    // Compute simple linear regression (y = m*x + b)
+    // x = [1,2,3,...] (days), y = price
+    function linearRegression(yValues) {
+      const n = yValues.length;
+      const xValues = [];
+      for (let i = 0; i < n; i++) {
+        xValues.push(i + 1); // 1..n
+      }
+
+      let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0;
+      for (let i = 0; i < n; i++) {
+        const x = xValues[i];
+        const y = yValues[i];
+        sumX += x;
+        sumY += y;
+        sumXY += x * y;
+        sumX2 += x * x;
+      }
+
+      // slope (m) and intercept (b)
+      const m = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
+      const b = (sumY - m * sumX) / n;
+
+      return { m, b, xValues, yValues };
+    }
+
+    // Draw simple chart using Canvas
+    function drawChart(actualPrices, predictedPoint) {
+      const canvas = document.getElementById("chart");
+      const ctx = canvas.getContext("2d");
+
+      // Set canvas size
+      canvas.width = canvas.clientWidth;
+      canvas.height = canvas.clientHeight;
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      if (actualPrices.length === 0) return;
+
+      // Find min and max for scaling
+      let minY = Math.min(...actualPrices, predictedPoint.y);
+      let maxY = Math.max(...actualPrices, predictedPoint.y);
+
+      // add small padding
+      const padding = (maxY - minY) * 0.1 || 1;
+      minY -= padding;
+      maxY += padding;
+
+      const leftPadding = 40;
+      const rightPadding = 20;
+      const topPadding = 20;
+      const bottomPadding = 40;
+
+      const chartWidth = canvas.width - leftPadding - rightPadding;
+      const chartHeight = canvas.height - topPadding - bottomPadding;
+
+      // Draw axes
+      ctx.beginPath();
+      ctx.moveTo(leftPadding, topPadding);
+      ctx.lineTo(leftPadding, canvas.height - bottomPadding);
+      ctx.lineTo(canvas.width - rightPadding, canvas.height - bottomPadding);
+      ctx.stroke();
+
+      // Function to convert data point to canvas coordinates
+      function toCanvasCoords(xIndex, yValue) {
+        const n = actualPrices.length + 1; // including next day
+        const x = leftPadding + (xIndex / n) * chartWidth;
+        const t = (yValue - minY) / (maxY - minY);
+        const y = canvas.height - bottomPadding - t * chartHeight;
+        return { x, y };
+      }
+
+      // Draw actual price line
+      ctx.beginPath();
+      for (let i = 0; i < actualPrices.length; i++) {
+        const p = toCanvasCoords(i + 1, actualPrices[i]);
+        if (i === 0) ctx.moveTo(p.x, p.y);
+        else ctx.lineTo(p.x, p.y);
+      }
+      ctx.stroke();
+
+      // Draw predicted point
+      const predCoords = toCanvasCoords(actualPrices.length + 1, predictedPoint.y);
+      ctx.beginPath();
+      ctx.arc(predCoords.x, predCoords.y, 5, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Label axes
+      ctx.font = "12px Arial";
+      ctx.fillText("Days", canvas.width / 2, canvas.height - 10);
+      ctx.save();
+      ctx.translate(12, canvas.height / 2);
+      ctx.rotate(-Math.PI / 2);
+      ctx.fillText("Price", 0, 0);
+      ctx.restore();
+    }
+
+    document.getElementById("predictBtn").addEventListener("click", function () {
+      const inputText = document.getElementById("priceInput").value;
+      const prices = parsePrices(inputText);
+
+      const resultBox = document.getElementById("resultBox");
+      const equationText = document.getElementById("equationText");
+      const predictionText = document.getElementById("predictionText");
+      const detailsText = document.getElementById("detailsText");
+
+      if (prices.length < 2) {
+        resultBox.style.display = "block";
+        equationText.textContent = "Please enter at least 2 valid prices.";
+        predictionText.textContent = "";
+        detailsText.textContent = "";
+        return;
+      }
+
+      // Perform linear regression
+      const reg = linearRegression(prices);
+      const m = reg.m;
+      const b = reg.b;
+
+      // Next day index (n+1)
+      const nextX = prices.length + 1;
+      const predictedPrice = m * nextX + b;
+
+      // Show result
+      resultBox.style.display = "block";
+      equationText.textContent =
+        `Regression line: price = ${m.toFixed(4)} × day + ${b.toFixed(4)}`;
+      predictionText.textContent =
+        `Predicted price for day ${nextX}: ${predictedPrice.toFixed(2)}`;
+
+      const lastActual = prices[prices.length - 1];
+      detailsText.textContent =
+        `Last actual price (day ${prices.length}): ${lastActual.toFixed(2)}. ` +
+        `This is a simple demonstration model and not for real trading.`;
+
+      // Draw chart
+      drawChart(prices, { x: nextX, y: predictedPrice });
+    });
+
+    // Initial draw when page loads
+    window.addEventListener("load", function () {
+      document.getElementById("predictBtn").click();
+    });
+  </script>
+</body>
+</html>
